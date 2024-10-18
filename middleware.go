@@ -18,7 +18,6 @@ import (
 	"github.com/moesif/moesifapi-go/models"
 )
 
-// Global variable
 var (
 	apiClient            moesifapi.API
 	debug                bool
@@ -27,10 +26,72 @@ var (
 	logBody              bool
 	logBodyOutgoing      bool
 	appConfig            = NewAppConfig()
-	// governanceRules      = NewGovernanceRules()
 )
 
-var _ = (*gin.Context)(nil)
+func MoesifMiddleware(configurationOption map[string]interface{}) gin.HandlerFunc {
+	// Call the function to initialize the moesif client and moesif options
+	if apiClient == nil {
+		moesifOption = configurationOption
+		moesifClient(moesifOption)
+	}
+
+	return gin.HandlerFunc(func(c *gin.Context) {
+		// Create a new LogGinResponseWriter to capture the response status and body for logging
+		lgw := NewLogGinResponseWriter(c.Writer)
+		c.Writer = lgw
+
+		if !disableTransactionId {
+			transactionId := c.Request.Header.Get("X-Moesif-Transaction-Id")
+			if len(transactionId) == 0 {
+				transactionId, _ = uuid()
+			}
+			if len(transactionId) != 0 {
+				c.Request.Header.Set("X-Moesif-Transaction-Id", transactionId)
+				c.Writer.Header().Add("X-Moesif-Transaction-Id", transactionId)
+			}
+		}
+
+		requestTime := time.Now().UTC()
+		var body1, body2 io.ReadCloser
+		var err error
+		if logBody {
+			// buffer the entire request body into memory for logging
+			if body1, body2, err = teeBody(c.Request.Body); err != nil {
+				log.Printf("Error while reading request body: %v.\n", err)
+			} else {
+				// Body is a ReadCloser meaning that it does not implement the Seek interface
+				// It must be buffered into memory to be read more than once
+				// This is a replacement reader reading the buffer for the original server handler
+				c.Request.Body = body1
+			}
+		}
+
+		c.Next()
+
+		// Response Time
+		responseTime := time.Now().UTC()
+
+		shouldSkip := false
+		if callback, found := moesifOption["Should_Skip"]; found {
+			shouldSkip = callback.(func(*gin.Context) bool)(c)
+		}
+
+		if shouldSkip {
+			if debug {
+				log.Printf("Skip sending the event to Moesif")
+			}
+		} else {
+			if debug {
+				log.Printf("Sending the event to Moesif")
+			}
+			if logBody {
+				// this is a separate ReadCloser, reading the same buffer as above for logging
+				c.Request.Body = body2
+			}
+			sendEvent(c, lgw, requestTime, responseTime)
+		}
+	})
+}
 
 // Initialize the client
 func moesifClient(moesifOption map[string]interface{}) {
@@ -230,73 +291,6 @@ func UpdateSubscriptionsBatch(subscriptions []*models.SubscriptionModel, configu
 	} else {
 		log.Println("Updated subscriptions successfully added to the queue")
 	}
-}
-
-// Moesif Middleware
-func MoesifMiddleware(configurationOption map[string]interface{}) gin.HandlerFunc {
-	// Call the function to initialize the moesif client and moesif options
-	if apiClient == nil {
-		moesifOption = configurationOption
-		moesifClient(moesifOption)
-	}
-
-	return gin.HandlerFunc(func(c *gin.Context) {
-		// Create a new LogGinResponseWriter to capture the response status and body for logging
-		lgw := NewLogGinResponseWriter(c.Writer)
-		c.Writer = lgw
-
-		if !disableTransactionId {
-			transactionId := c.Request.Header.Get("X-Moesif-Transaction-Id")
-			if len(transactionId) == 0 {
-				transactionId, _ = uuid()
-			}
-
-			if len(transactionId) != 0 {
-				c.Request.Header.Set("X-Moesif-Transaction-Id", transactionId)
-				c.Writer.Header().Add("X-Moesif-Transaction-Id", transactionId)
-			}
-		}
-
-		requestTime := time.Now().UTC()
-		var body1, body2 io.ReadCloser
-		var err error
-		if logBody {
-			// buffer the entire request body into memory for logging
-			if body1, body2, err = teeBody(c.Request.Body); err != nil {
-				log.Printf("Error while reading request body: %v.\n", err)
-			} else {
-				// Body is a ReadCloser meaning that it does not implement the Seek interface
-				// It must be buffered into memory to be read more than once
-				// This is a replacement reader reading the buffer for the original server handler
-				c.Request.Body = body1
-			}
-		}
-
-		c.Next()
-
-		// Response Time
-		responseTime := time.Now().UTC()
-
-		shouldSkip := false
-		if callback, found := moesifOption["Should_Skip"]; found {
-			shouldSkip = callback.(func(*gin.Context) bool)(c)
-		}
-
-		if shouldSkip {
-			if debug {
-				log.Printf("Skip sending the event to Moesif")
-			}
-		} else {
-			if debug {
-				log.Printf("Sending the event to Moesif")
-			}
-			if logBody {
-				// this is a separate ReadCloser, reading the same buffer as above for logging
-				c.Request.Body = body2
-			}
-			sendEvent(c, lgw, requestTime, responseTime)
-		}
-	})
 }
 
 func sendEvent(c *gin.Context, response *logGinResponseWriter, reqTime time.Time, rspTime time.Time) {
