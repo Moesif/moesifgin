@@ -71,7 +71,7 @@ moesifgin.StartCaptureOutgoing(moesifOptions)
 ```
 
 #### `moesifOptions` (Required)
-A `map[string]interface{}` type containing the configuration options for your application. See [the example application code](https://github.com/Moesif/moesifgin-example/blob/master/main.go) for better understanding.
+A `map[string]interface{}` type containing the configuration options for your application. See [the example Gin server code](https://github.com/Moesif/moesifgin/blob/master/example/main.go) for better understanding.
 
 See [Configuration Options](#configuration-options) for the common configuration options. See [Options for Logging Outgoing Calls](#options-for-logging-outgoing-calls) for configuration options specific to capturing and logging outgoing API calls.
 
@@ -84,7 +84,7 @@ Other troubleshooting supports:
 - [Moesif support email](mailto:support@moesif.com)
 
 ## Configuration Options
-The following sections describe the available configuration options for this middleware. You can set these options in the Moesif initialization options object. See the [example application code](https://github.com/Moesif/moesifgin-example/blob/master/main.go) to understand how you can specify these options.
+The following sections describe the available configuration options for this middleware. You can set these options in the Moesif initialization options object. See the [example](https://github.com/Moesif/moesifgin/blob/master/example/main.go) to understand how you can specify these options.
 
 ### `Application_Id` (Required)
 <table>
