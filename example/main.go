@@ -12,7 +12,7 @@ func main() {
 	r := gin.New()
 
 	moesifOptions := map[string]interface{}{
-		"Application_Id":   "eyJhcHAiOiIxOTg6NzQ0IiwidmVyIjoiMi4xIiwib3JnIjoiNjQwOjEyOCIsImlhdCI6MTcyNzc0MDgwMH0.ckqMfkn4o0zgfLokgP_WvMIXAOYm77PV6ACbMAlzYC0",
+		"Application_Id":   "<Your Moesif Application Id>",
 		"Log_Body":         true,
 		"Identify_User":    func(c *gin.Context) string { return c.Request.Header.Get("X-User-Id") },
 		"Identify_Company": func(c *gin.Context) string { return c.Request.Header.Get("X-Company-Id") },
